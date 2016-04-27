@@ -32,20 +32,27 @@ CORTEX_M := 3
 family:=stm32f1xx
 FAMILY:=STM32F1xx
 SOC  := STM32F103xB
+	
+# USER_DEFINES
+USER_DEFINES += -include Inc/config.h
 
 # Files
-objs := $(patsubst %.c,%.o,$(wildcard Src/*.c)) \
-	$(patsubst %.c,%.o,$(wildcard ../src/*.c)) \
-    Drivers/CMSIS/Device/ST/$(FAMILY)/Source/Templates/system_$(family).o \
-    Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal.o \
-    Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_cortex.o \
-    Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_rcc.o \
-    Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_tim.o \
-    Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_tim_ex.o \
-    Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_gpio.o \
-    Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_uart.o \
-    Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_pwr.o \
-    Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_dma.o \
+VPATH += ../src
+lib_objs := lcd1602a_stm32.o
+
+objs := \
+	$(lib_objs) \
+	$(patsubst %.c,%.o,$(wildcard Src/*.c)) \
+	Drivers/CMSIS/Device/ST/$(FAMILY)/Source/Templates/system_$(family).o \
+	Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal.o \
+	Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_cortex.o \
+	Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_rcc.o \
+	Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_tim.o \
+	Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_tim_ex.o \
+	Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_gpio.o \
+	Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_uart.o \
+	Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_pwr.o \
+	Drivers/$(FAMILY)_HAL_Driver/Src/$(family)_hal_dma.o \
 
 IPATH +=-IInc/ -IDrivers/CMSIS/Include -IDrivers/$(FAMILY)_HAL_Driver/Inc -IDrivers/CMSIS/Device/ST/$(FAMILY)/Include -I../inc
 
@@ -78,11 +85,11 @@ CONFIG_DEFINES += -D__thumb__ -D${ARCH} -D${CORE} -D${CPU} -D${SOC} \
 WARN_FLAGS = -Wall -Wextra -Wextra \
              -Wlogical-op -Werror=logical-op \
               
-CFLAGS := -O1 -mthumb --specs=nosys.specs --specs=nano.specs\
+CFLAGS := -Os -mthumb --specs=nosys.specs --specs=nano.specs\
           -mcpu=cortex-m$(CORTEX_M) \
           -D__STARTUP_CLEAR_BSS -D__START=main \
           -ffunction-sections -fdata-sections \
-          -std=gnu11 $(WARN_FLAGS) $(CONFIG_DEFINES) $(IPATH) -g
+          -std=c99 $(WARN_FLAGS) $(CONFIG_DEFINES) $(USER_DEFINES) $(IPATH) -g
 
 ASFLAGS := $(CFLAGS)
 
@@ -94,7 +101,7 @@ OBJS := $(addprefix $(BUILD)/, $(objs))
 DIR_LIST := $(dir $(OBJS))
 
 #Rules
-all :dir $(BUILD)/$(NAME).bin Makefile 
+all : dir $(BUILD)/$(NAME).bin Makefile ## Make all (default)
 .PHONY : all
 
 .PHONY: help
@@ -113,7 +120,12 @@ dir: ## Generate dir tree
 	$(NOECHO) echo "Creating dir tree $< ..."
 	$(NOECHO) mkdir -p $(DIR_LIST)
 
-$(BUILD)/%.o: %.c ## Generate object files from c source files
+.PRECIOUS: $(BUILD)/%.i
+$(BUILD)/%.i: %.c ## Generate preprocessed files from c source files
+	$(NOECHO) echo "Compile $< ..."
+	$(NOECHO) $(CC) $(CFLAGS) -E $< -o $@
+
+$(BUILD)/%.o: $(BUILD)/%.i ## Generate object files from c source files
 	$(NOECHO) echo "Compile $< ..."
 	$(NOECHO) $(CC) $(CFLAGS) -c $< -o $@
 
@@ -133,6 +145,7 @@ $(BUILD)/$(NAME).bin: $(BUILD)/$(NAME).elf ## Strip down elf to bin
 	$(NOECHO) echo "Striping $< ..."
 	$(NOECHO) $(OBJCOPY) -O binary $< $@
 
+.PHONY : clean
 clean: ## Remove build artifacts
 	$(NOECHO) echo "Clean up ..."
 	$(NOECHO) rm -rf $(BUILD)

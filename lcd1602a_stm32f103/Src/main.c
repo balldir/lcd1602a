@@ -62,20 +62,14 @@ void SystemClock_Config(void);
 /*Looks ugly. Probably need a macro*/
 __attribute__((section(".stack"))) __attribute__((used)) static uint8_t stack[STACK_SIZE]  = {};
 
-ssize_t _write (int fd, const void * buf, size_t count)
+static void gpio_write(GPIO_TypeDef* port, uint16_t pin, unsigned int state)
 {
-    HAL_UART_Transmit(&huart2, (uint8_t *)buf, count, 10000);
-    return count;
+	HAL_GPIO_WritePin(port, pin, (GPIO_PinState)state);
 }
 
-static void gpio_write(unsigned int port, unsigned int pin, unsigned int state)
+static unsigned int gpio_read(GPIO_TypeDef* port, uint16_t pin)
 {
-	HAL_GPIO_WritePin((GPIO_TypeDef*) port, (uint16_t)pin, (GPIO_PinState)state);
-}
-
-static void gpio_read(unsigned int port, unsigned int pin, unsigned int state)
-{
-	return HAL_GPIO_ReadPin((GPIO_TypeDef*) port, (uint16_t)pin);
+	return HAL_GPIO_ReadPin(port, pin);
 }
 
 static void wait_ns(unsigned int ns)
@@ -88,28 +82,34 @@ lcd1602a_ctx_t lcd = {
 		.gpio_read_pin = gpio_read,
 		.wait_ns = wait_ns,
 		.e_pin = {
-			.port = (unsigned long) GPIOB,
+			.port = GPIOB,
 			.pin = GPIO_PIN_13,
 		},
 		.rs_pin = {
-			.port = (unsigned long) GPIOB,
+			.port = GPIOB,
 			.pin = GPIO_PIN_15,
 		},
 		.rw_pin = {
-			.port = (unsigned long) GPIOB,
+			.port = GPIOB,
 			.pin = GPIO_PIN_14,
 		},
 		.data_pins = {
-				{(unsigned long) GPIOB,GPIO_PIN_3},
-				{(unsigned long) GPIOB,GPIO_PIN_4},
-				{(unsigned long) GPIOB,GPIO_PIN_5},
-				{(unsigned long) GPIOB,GPIO_PIN_6},
-				{(unsigned long) GPIOB,GPIO_PIN_7},
-				{(unsigned long) GPIOB,GPIO_PIN_8},
-				{(unsigned long) GPIOB,GPIO_PIN_9},
-				{(unsigned long) GPIOB,GPIO_PIN_12},
+				{ GPIOB,GPIO_PIN_3},
+				{ GPIOB,GPIO_PIN_4},
+				{ GPIOB,GPIO_PIN_10},
+				{ GPIOB,GPIO_PIN_6},
+				{ GPIOB,GPIO_PIN_7},
+				{ GPIOB,GPIO_PIN_8},
+				{ GPIOB,GPIO_PIN_9},
+				{ GPIOB,GPIO_PIN_12},
 		},
 };
+
+ssize_t _write (int fd, const void * buf, size_t count)
+{
+    lcd1602a_print_data(&lcd, buf, count);
+    return count;
+}
 /* USER CODE END 0 */
 
 int main(void)
@@ -134,12 +134,10 @@ int main(void)
   MX_GPIO_Init();
 
   /* USER CODE BEGIN 2 */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, 1);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, 1);
-	printf("Test\n");
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_3, 1);
-	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, 1);
-	lcd1602a_init(&lcd);
+  __HAL_AFIO_REMAP_SWJ_NOJTAG();
+  lcd1602a_init(&lcd);
+  printf("0x%X %i %s", 25, -1, "TesT");
+  fflush(stdout);
   /* USER CODE END 2 */
 
   /* Infinite loop */

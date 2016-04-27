@@ -164,6 +164,16 @@ lcd1602a_error_t lcd1602a_read_data_ram (const lcd1602a_ctx_t * ctx, unsigned in
 	return error;
 }
 
+int lcd1602a_print_data(const lcd1602a_ctx_t * ctx, const char* data, unsigned int datalen)
+{
+	lcd1602a_error_t status = LCD1602A_OK;
+	int i = 0;
+	for (; i < datalen && status == LCD1602A_OK; i++) {
+		status = lcd1602a_write_data_ram(ctx, data[i], LCD1602A_WAIT);
+	}
+	return (status == LCD1602A_OK)? i : status;
+}
+
 lcd1602a_error_t lcd1602a_init(const lcd1602a_ctx_t * ctx)
 {
 	if (lcd1602a_check_ctx(ctx) != LCD1602A_OK) {
@@ -181,7 +191,5 @@ lcd1602a_error_t lcd1602a_init(const lcd1602a_ctx_t * ctx)
 	lcd1602a_clear_display(ctx, LCD1602A_WAIT);
 	lcd1602a_entry_mode_set(ctx, LCD1602A_INCREMENT_ADDR, LCD1602A_NO_SHIFT, LCD1602A_WAIT);
 	lcd1602a_display_onoff(ctx, LCD1602A_DISPLAY_ON, LCD1602A_CURSOR_OFF, LCD1602A_CURSOR_BLINK_ON, LCD1602A_WAIT);
-	lcd1602a_write_data_ram(ctx, 'T', LCD1602A_WAIT);
-
 	return LCD1602A_OK;
 }
