@@ -37,6 +37,7 @@ static void wait_ns(unsigned int ns)
 }
 
 lcd1602a_ctx_t lcd = {
+        .interface = LCD1602A_INTERFACE_8B,
 		.gpio_write_pin = gpio_write,
 		.gpio_read_pin = gpio_read,
 		.wait_ns = wait_ns,

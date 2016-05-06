@@ -78,6 +78,7 @@ static void wait_ns(unsigned int ns)
 }
 
 lcd1602a_ctx_t lcd = {
+		.interface = LCD1602A_INTERFACE_8B,
 		.gpio_write_pin = gpio_write,
 		.gpio_read_pin = gpio_read,
 		.wait_ns = wait_ns,
@@ -136,7 +137,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   __HAL_AFIO_REMAP_SWJ_NOJTAG();
   lcd1602a_init(&lcd);
-  printf("0x%X %i %s", 25, -1, "TesT");
+  printf("0x%X %u %s", 25, lcd.interface, "New Test");
   fflush(stdout);
   /* USER CODE END 2 */
 

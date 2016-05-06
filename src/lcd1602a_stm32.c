@@ -13,6 +13,7 @@
 #define LCD1602A_TH_NS   10
 #define LCD1602A_TC_NS   1200
 #define LCD1602A_TDDR_NS 100
+#define LCD1602A_4_BITS_OFFSET 4
 
 #define US_TO_NS(x) (x * 1000)
 #define MS_TO_NS(x) (x * 1000000)
@@ -30,29 +31,54 @@ lcd1602a_error_t lcd1602a_xfer(const lcd1602a_ctx_t * ctx, lcd1602a_rs_state_t r
 	if (lcd1602a_check_ctx(ctx) != LCD1602A_OK) {
 		return LCD1602A_ERROR;
 	}
-	ctx->gpio_write_pin(ctx->rs_pin.port, ctx->rs_pin.pin, rs_state);
-	ctx->gpio_write_pin(ctx->rw_pin.port, ctx->rw_pin.pin, rw_state);
-	ctx->wait_ns(LCD1602A_TAS_NS);
-	ctx->gpio_write_pin(ctx->e_pin.port, ctx->e_pin.pin, 1);
-	ctx->wait_ns(LCD1602A_TPW_NS - LCD1602A_TDSW_NS);
-	if (rw_state == LCD1602A_RW_WRITE) {
-		for (unsigned int i = 0; i < 8; i++) {
-			ctx->gpio_write_pin(ctx->data_pins[i].port, ctx->data_pins[i].pin, (*data_eight_bits >> i) & 1);
+	if (ctx->interface == LCD1602A_INTERFACE_8B) {
+		ctx->gpio_write_pin(ctx->rs_pin.port, ctx->rs_pin.pin, rs_state);
+		ctx->gpio_write_pin(ctx->rw_pin.port, ctx->rw_pin.pin, rw_state);
+		ctx->wait_ns(LCD1602A_TAS_NS);
+		ctx->gpio_write_pin(ctx->e_pin.port, ctx->e_pin.pin, 1);
+		ctx->wait_ns(LCD1602A_TPW_NS - LCD1602A_TDSW_NS);
+		if (rw_state == LCD1602A_RW_WRITE) {
+			for (unsigned int i = 0; i < 8; i++) {
+				ctx->gpio_write_pin(ctx->data_pins[i].port, ctx->data_pins[i].pin, (*data_eight_bits >> i) & 1);
+			}
+		}
+		else {
+			for (unsigned int i = 0; i < 8; i++) {
+				*data_eight_bits |= (!!ctx->gpio_read_pin(ctx->data_pins[i].port, ctx->data_pins[i].pin)) << i;
+			}
+		}
+		ctx->wait_ns(LCD1602A_TDSW_NS);
+		ctx->gpio_write_pin(ctx->e_pin.port, ctx->e_pin.pin, 0);
+		if (wait == LCD1602A_WAIT)  {
+			ctx->wait_ns(LCD1602A_TC_NS - LCD1602A_TPW_NS);
 		}
 	}
 	else {
-		for (unsigned int i = 0; i < 8; i++) {
-			*data_eight_bits |= (!!ctx->gpio_read_pin(ctx->data_pins[i].port, ctx->data_pins[i].pin)) << i;
+		for (int j=1; j >= 0; j--) {
+			ctx->gpio_write_pin(ctx->rs_pin.port, ctx->rs_pin.pin, rs_state);
+			ctx->gpio_write_pin(ctx->rw_pin.port, ctx->rw_pin.pin, rw_state);
+			ctx->wait_ns(LCD1602A_TAS_NS);
+			ctx->gpio_write_pin(ctx->e_pin.port, ctx->e_pin.pin, 1);
+			ctx->wait_ns(LCD1602A_TPW_NS - LCD1602A_TDSW_NS);
+			if (rw_state == LCD1602A_RW_WRITE) {
+				for (unsigned int i = 0; i < 4; i++) {
+					ctx->gpio_write_pin(ctx->data_pins[i + LCD1602A_4_BITS_OFFSET].port, ctx->data_pins[i + LCD1602A_4_BITS_OFFSET].pin, (*data_eight_bits >> (i + j*LCD1602A_4_BITS_OFFSET) & 1));
+				}
+			}
+			else {
+				for (unsigned int i = 0; i < 4; i++) {
+					*data_eight_bits |= (!!ctx->gpio_read_pin(ctx->data_pins[i + LCD1602A_4_BITS_OFFSET].port, ctx->data_pins[i + LCD1602A_4_BITS_OFFSET].pin)) << (i + j*LCD1602A_4_BITS_OFFSET);
+				}
+			}
+			ctx->wait_ns(LCD1602A_TDSW_NS);
+			ctx->gpio_write_pin(ctx->e_pin.port, ctx->e_pin.pin, 0);
+			if (j || wait == LCD1602A_WAIT)  {
+				ctx->wait_ns(LCD1602A_TC_NS - LCD1602A_TPW_NS);
+			}
 		}
-	}
-	ctx->wait_ns(LCD1602A_TDSW_NS);
-	ctx->gpio_write_pin(ctx->e_pin.port, ctx->e_pin.pin, 0);
-	if (wait == LCD1602A_WAIT)  {
-		ctx->wait_ns(LCD1602A_TC_NS - LCD1602A_TPW_NS);
 	}
 	return LCD1602A_OK;
 }
-
 
 lcd1602a_error_t lcd1602a_clear_display(const lcd1602a_ctx_t * ctx, lcd1602a_wait_t wait)
 {
@@ -179,17 +205,38 @@ lcd1602a_error_t lcd1602a_init(const lcd1602a_ctx_t * ctx)
 	if (lcd1602a_check_ctx(ctx) != LCD1602A_OK) {
 		return LCD1602A_ERROR;
 	}
-	ctx->wait_ns(MS_TO_NS(15));
-	unsigned int data = 0b11 << 4;
-	lcd1602a_xfer(ctx, 0, 0, &data,  LCD1602A_WAIT);
-	ctx->wait_ns(MS_TO_NS(4.1));
-	lcd1602a_xfer(ctx, 0, 0, &data,  LCD1602A_WAIT);
-	ctx->wait_ns(US_TO_NS(4.1));
-	lcd1602a_xfer(ctx, 0, 0, &data,  LCD1602A_WAIT);
-	lcd1602a_function_set(ctx,LCD1602A_INTERFACE_8B, LCD1602A_LINES_2, LCD1602A_FONT_5X11, LCD1602A_WAIT);
-	lcd1602a_display_onoff(ctx, LCD1602A_DISPLAY_OFF, LCD1602A_CURSOR_OFF, LCD1602A_CURSOR_BLINK_OFF, LCD1602A_WAIT);
-	lcd1602a_clear_display(ctx, LCD1602A_WAIT);
-	lcd1602a_entry_mode_set(ctx, LCD1602A_INCREMENT_ADDR, LCD1602A_NO_SHIFT, LCD1602A_WAIT);
-	lcd1602a_display_onoff(ctx, LCD1602A_DISPLAY_ON, LCD1602A_CURSOR_OFF, LCD1602A_CURSOR_BLINK_ON, LCD1602A_WAIT);
+	if (ctx->interface == LCD1602A_INTERFACE_8B) {
+		ctx->wait_ns(MS_TO_NS(15));
+		unsigned int data = 0b11 << 4;
+		lcd1602a_xfer(ctx, 0, 0, &data,  LCD1602A_WAIT);
+		ctx->wait_ns(MS_TO_NS(4.1));
+		lcd1602a_xfer(ctx, 0, 0, &data,  LCD1602A_WAIT);
+		ctx->wait_ns(US_TO_NS(4.1));
+		lcd1602a_xfer(ctx, 0, 0, &data,  LCD1602A_WAIT);
+		lcd1602a_function_set(ctx,LCD1602A_INTERFACE_8B, LCD1602A_LINES_2, LCD1602A_FONT_5X11, LCD1602A_WAIT);
+		lcd1602a_display_onoff(ctx, LCD1602A_DISPLAY_OFF, LCD1602A_CURSOR_OFF, LCD1602A_CURSOR_BLINK_OFF, LCD1602A_WAIT);
+		lcd1602a_clear_display(ctx, LCD1602A_WAIT);
+		lcd1602a_entry_mode_set(ctx, LCD1602A_INCREMENT_ADDR, LCD1602A_NO_SHIFT, LCD1602A_WAIT);
+		lcd1602a_display_onoff(ctx, LCD1602A_DISPLAY_ON, LCD1602A_CURSOR_OFF, LCD1602A_CURSOR_BLINK_ON, LCD1602A_WAIT);
+	}
+	else {
+		lcd1602a_ctx_t tmp_ctx = *ctx;
+		tmp_ctx.interface = LCD1602A_INTERFACE_8B;
+		unsigned int data = 0b11 << 4;
+		lcd1602a_xfer(&tmp_ctx, 0, 0, &data,  LCD1602A_WAIT);
+		ctx->wait_ns(MS_TO_NS(4.1));
+		lcd1602a_xfer(&tmp_ctx, 0, 0, &data,  LCD1602A_WAIT);
+		ctx->wait_ns(US_TO_NS(4.1));
+		lcd1602a_xfer(&tmp_ctx, 0, 0, &data,  LCD1602A_WAIT);
+		ctx->wait_ns(US_TO_NS(4.1));
+		data = 0b10 << 4;
+		lcd1602a_xfer(&tmp_ctx, 0, 0, &data,  LCD1602A_WAIT);
+		ctx->wait_ns(MS_TO_NS(4.1));
+		lcd1602a_function_set(ctx, LCD1602A_INTERFACE_4B, LCD1602A_LINES_2, LCD1602A_FONT_5X11, LCD1602A_WAIT);
+		lcd1602a_display_onoff(ctx, LCD1602A_DISPLAY_OFF, LCD1602A_CURSOR_OFF, LCD1602A_CURSOR_BLINK_OFF, LCD1602A_WAIT);
+		lcd1602a_clear_display(ctx, LCD1602A_WAIT);
+		lcd1602a_entry_mode_set(ctx, LCD1602A_INCREMENT_ADDR, LCD1602A_NO_SHIFT, LCD1602A_WAIT);
+		lcd1602a_display_onoff(ctx, LCD1602A_DISPLAY_ON, LCD1602A_CURSOR_OFF, LCD1602A_CURSOR_BLINK_ON, LCD1602A_WAIT);
+	}
 	return LCD1602A_OK;
 }
