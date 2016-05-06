@@ -177,7 +177,8 @@ typedef enum {
  * Avaliable interface config
  */
 typedef enum {
-	LCD1602A_INTERFACE_4B = 0x0,  /**< Use 4 lines interface */
+	LCD1602A_INTERFACE_4B = 0x0,  /**< Use 4 lines interface
+	                               *(lcd1602a_ctx_t.data_pins[4-7] should be inited) */
 	LCD1602A_INTERFACE_8B = 0x10, /**< Use 8 lines interface */
 } lcd1602a_interface_t;
 
@@ -191,6 +192,7 @@ typedef struct _lcd1602a_pin_t {
  * LCD1602 library context
  */
 typedef struct _lcd1602a_ctx_t {
+	lcd1602a_interface_t  interface;
 	/** Function for setting pin state */
 	void                  (*gpio_write_pin)(gpio_port_t port, gpio_t pin, 
                               unsigned int state);
