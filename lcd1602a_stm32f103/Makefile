@@ -145,6 +145,10 @@ $(BUILD)/$(NAME).bin: $(BUILD)/$(NAME).elf ## Strip down elf to bin
 	$(NOECHO) echo "Striping $< ..."
 	$(NOECHO) $(OBJCOPY) -O binary $< $@
 
+.PHONY : cppcheck
+cppcheck : ## run cppcheck
+	find . -name \*.i | xargs cppcheck  --xml-version=2 --xml 2> $(BUILD)/cppcheck.result
+
 .PHONY : clean
 clean: ## Remove build artifacts
 	$(NOECHO) echo "Clean up ..."
